@@ -1,8 +1,14 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { ArrowLeft, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import DiaryEntryForm from '@/components/DiaryEntryForm';
-import { useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 const moodThemes = {
   happy: {
@@ -53,58 +59,178 @@ const moodThemes = {
     text: 'text-teal-900',
     accent: 'border-teal-200',
   },
+  neutral: {
+    background: 'bg-gradient-to-br from-gray-50 to-slate-50',
+    card: 'bg-gray-50/80',
+    text: 'text-gray-900',
+    accent: 'border-gray-200',
+  },
 };
 
 export default function WritingPage() {
   const { mood } = useParams<{ mood: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [content, setContent] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [entrySetup, setEntrySetup] = useState<any>(null);
   
   const theme = mood && moodThemes[mood as keyof typeof moodThemes] 
     ? moodThemes[mood as keyof typeof moodThemes]
-    : moodThemes.calm;
+    : moodThemes.neutral;
 
   useEffect(() => {
-    if (!mood || !moodThemes[mood as keyof typeof moodThemes]) {
-      navigate('/');
+    // Get the entry setup data from session storage
+    const setupData = sessionStorage.getItem('entrySetup');
+    if (setupData) {
+      setEntrySetup(JSON.parse(setupData));
     }
-  }, [mood, navigate]);
+  }, []);
 
-  const handleEntryComplete = () => {
+  const uploadPhoto = async (file: File): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user!.id}/${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('diary-photos')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage
+        .from('diary-photos')
+        .getPublicUrl(data.path);
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      return null;
+    }
+  };
+
+  const handleSave = async () => {
+    if (!content.trim()) {
+      toast({
+        title: "Content required",
+        description: "Please write something in your diary entry.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      let photoUrl = null;
+
+      // Upload photo if exists
+      if (entrySetup?.photoFile) {
+        photoUrl = await uploadPhoto(entrySetup.photoFile);
+      }
+
+      const entryData = {
+        user_id: user!.id,
+        title: entrySetup?.title || null,
+        content: content.trim(),
+        entry_date: format(new Date(), 'yyyy-MM-dd'),
+        mood: (mood || null) as 'happy' | 'sad' | 'excited' | 'calm' | 'anxious' | 'grateful' | 'angry' | 'peaceful' | null,
+        photo_url: photoUrl,
+      };
+
+      const { error } = await supabase
+        .from('diary_entries')
+        .insert(entryData);
+
+      if (error) throw error;
+
+      toast({
+        title: "Entry saved!",
+        description: "Your diary entry has been saved successfully."
+      });
+
+      // Clear session storage
+      sessionStorage.removeItem('entrySetup');
+      navigate('/');
+    } catch (error) {
+      console.error('Error saving entry:', error);
+      toast({
+        title: "Save failed",
+        description: "Failed to save your diary entry. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBack = () => {
     navigate('/');
   };
 
   return (
     <div className={`min-h-screen ${theme.background} p-4`}>
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center mb-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/')}
-            className={`${theme.text} hover:bg-white/50`}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </div>
-        
-        <div className={`rounded-xl ${theme.card} backdrop-blur-sm border ${theme.accent} p-6 shadow-lg`}>
-          <div className="mb-6">
-            <h1 className={`text-2xl font-light ${theme.text} mb-2`}>
-              Express Your Feelings
-            </h1>
-            <p className={`${theme.text} opacity-80`}>
-              Write about your {mood} mood and capture this moment
-            </p>
+      {/* Header */}
+      <header className={`${theme.card} backdrop-blur-sm border ${theme.accent} rounded-lg mb-6 p-4`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBack}
+              className={`${theme.text} hover:bg-white/50`}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <div>
+              <h1 className={`text-xl font-light ${theme.text}`}>
+                Express Your Feelings
+              </h1>
+              {entrySetup?.title && (
+                <p className={`text-sm ${theme.text} opacity-80`}>
+                  {entrySetup.title}
+                </p>
+              )}
+            </div>
           </div>
           
-          <DiaryEntryForm
-            entry={null}
-            selectedDate={new Date()}
-            onBack={handleEntryComplete}
-            onSaved={handleEntryComplete}
-            preselectedMood={mood}
-          />
+          <Button 
+            onClick={handleSave}
+            disabled={loading}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            {loading ? 'Saving...' : 'Save Entry'}
+          </Button>
+        </div>
+      </header>
+      
+      <div className="max-w-4xl mx-auto">
+        <div className={`rounded-xl ${theme.card} backdrop-blur-sm border ${theme.accent} p-6 shadow-lg`}>
+          {entrySetup?.photo && (
+            <div className="mb-6">
+              <img 
+                src={entrySetup.photo} 
+                alt="Entry photo" 
+                className="w-full max-h-64 object-cover rounded-lg border border-border/50"
+              />
+            </div>
+          )}
+          
+          <div className="space-y-2">
+            <Label htmlFor="content" className={`text-sm font-medium ${theme.text}`}>
+              What's on your mind?
+            </Label>
+            <Textarea
+              id="content"
+              placeholder="Dear diary, today was..."
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={20}
+              className={`border-border/50 focus:border-primary/50 resize-none bg-white/50 ${theme.text}`}
+            />
+          </div>
         </div>
       </div>
     </div>
