@@ -25,6 +25,8 @@ interface Props {
   selectedDate: Date;
   onBack: () => void;
   onSaved: () => void;
+  preselectedMood?: string;
+  hideControls?: boolean;
 }
 
 const moodOptions = [
@@ -38,15 +40,24 @@ const moodOptions = [
   { value: 'peaceful', label: '☮️ Peaceful', color: 'hsl(var(--mood-peaceful))' },
 ];
 
-export default function DiaryEntryForm({ entry, selectedDate, onBack, onSaved }: Props) {
+export default function DiaryEntryForm({ 
+  entry, 
+  selectedDate, 
+  onBack, 
+  onSaved, 
+  preselectedMood,
+  hideControls = false 
+}: Props) {
   const { user } = useAuth();
   const [title, setTitle] = useState(entry?.title || '');
   const [content, setContent] = useState(entry?.content || '');
-  const [mood, setMood] = useState(entry?.mood || '');
+  const [mood, setMood] = useState(entry?.mood || preselectedMood || '');
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState(entry?.photo_url || '');
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const isEditing = !!entry;
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -245,63 +256,67 @@ export default function DiaryEntryForm({ entry, selectedDate, onBack, onSaved }:
               />
             </div>
 
-            {/* Mood */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">How are you feeling?</Label>
-              <Select value={mood} onValueChange={setMood}>
-                <SelectTrigger className="border-border/50 focus:border-primary/50">
-                  <SelectValue placeholder="Select your mood..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {moodOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Mood - Hide when editing existing entries */}
+            {!isEditing && !hideControls && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">How are you feeling?</Label>
+                <Select value={mood} onValueChange={setMood}>
+                  <SelectTrigger className="border-border/50 focus:border-primary/50">
+                    <SelectValue placeholder="Select your mood..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {moodOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-            {/* Photo */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Photo (optional)</Label>
-              {photoUrl ? (
-                <div className="relative">
-                  <img 
-                    src={photoUrl} 
-                    alt="Diary entry" 
-                    className="w-full max-h-64 object-cover rounded-lg border border-border/50"
-                  />
-                  <Button
-                    onClick={removePhoto}
-                    variant="destructive"
-                    size="sm"
-                    className="absolute top-2 right-2"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : (
-                <div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoSelect}
-                    className="hidden"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full border-dashed border-border/50 hover:bg-secondary/50"
-                  >
-                    <Camera className="h-4 w-4 mr-2" />
-                    Add a photo to your memory
-                  </Button>
-                </div>
-              )}
-            </div>
+            {/* Photo - Hide when editing existing entries */}
+            {!isEditing && !hideControls && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Photo (optional)</Label>
+                {photoUrl ? (
+                  <div className="relative">
+                    <img 
+                      src={photoUrl} 
+                      alt="Diary entry" 
+                      className="w-full max-h-64 object-cover rounded-lg border border-border/50"
+                    />
+                    <Button
+                      onClick={removePhoto}
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-2 right-2"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoSelect}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full border-dashed border-border/50 hover:bg-secondary/50"
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Add a photo to your memory
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Content */}
             <div className="space-y-2">

@@ -6,6 +6,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO } from 'date-fns';
 import { BookOpen, Plus, LogOut, Calendar as CalendarIcon, Heart, Camera } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import DiaryEntryForm from './DiaryEntryForm';
 import DiaryTimeline from './DiaryTimeline';
@@ -26,6 +27,7 @@ interface Profile {
 
 export default function DiaryDashboard() {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedEntry, setSelectedEntry] = useState<DiaryEntry | null>(null);
@@ -185,14 +187,24 @@ export default function DiaryDashboard() {
             </Card>
 
             <Card className="border-border/50 shadow-lg bg-card/80 backdrop-blur-sm">
-              <CardContent className="pt-6">
-                <Button 
-                  onClick={handleNewEntry}
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Write New Entry
-                </Button>
+              <CardHeader>
+                <CardTitle className="text-lg font-light">Quick Start</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground mb-3">How are you feeling today?</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {['happy', 'sad', 'excited', 'calm', 'anxious', 'grateful', 'angry', 'peaceful'].map((mood) => (
+                    <Button
+                      key={mood}
+                      onClick={() => navigate(`/write/${mood}`)}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs capitalize hover:bg-primary/10"
+                    >
+                      {mood}
+                    </Button>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </div>
