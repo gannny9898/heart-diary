@@ -1,11 +1,12 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Smile } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -66,6 +67,14 @@ const moodThemes = {
     accent: 'border-gray-200',
   },
 };
+
+const commonEmojis = [
+  '😊', '😢', '😍', '😂', '🥺', '😘', '😎', '🤗', '😴', '🤔',
+  '😤', '😭', '🥰', '😁', '🙃', '😋', '🤩', '😇', '🥴', '🤪',
+  '❤️', '💕', '💖', '💙', '💚', '💛', '🧡', '💜', '🖤', '🤍',
+  '✨', '🌟', '⭐', '🌈', '🌸', '🌺', '🌻', '🌷', '🌹', '🌼',
+  '🎉', '🎊', '🎈', '🎂', '🎁', '🏆', '👑', '💎', '🔥', '💯'
+];
 
 export default function WritingPage() {
   const { mood } = useParams<{ mood: string }>();
@@ -227,6 +236,10 @@ export default function WritingPage() {
     navigate('/');
   };
 
+  const insertEmoji = (emoji: string) => {
+    setContent(prev => prev + emoji);
+  };
+
   return (
     <div className={`min-h-screen ${theme.background} p-4`}>
       {/* Header */}
@@ -277,10 +290,39 @@ export default function WritingPage() {
             </div>
           )}
           
-          <div className="space-y-2">
-            <Label htmlFor="content" className={`text-sm font-medium ${theme.text}`}>
-              What's on your mind?
-            </Label>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="content" className={`text-sm font-medium ${theme.text}`}>
+                What's on your mind?
+              </Label>
+              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`${theme.text} border-border/30 hover:bg-white/50 transition-all duration-200`}
+                  >
+                    <Smile className="h-4 w-4 mr-1" />
+                    Add Emoji
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-3">
+                  <div className="grid grid-cols-10 gap-1">
+                    {commonEmojis.map((emoji, index) => (
+                      <button
+                        key={index}
+                        onClick={() => insertEmoji(emoji)}
+                        className="w-8 h-8 text-lg hover:bg-accent hover:scale-110 rounded transition-all duration-150 flex items-center justify-center"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            
             <Textarea
               id="content"
               placeholder="Dear diary, today was..."
