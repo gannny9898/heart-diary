@@ -212,13 +212,11 @@ export default function DiaryDashboard() {
 
           {/* Timeline */}
           <div className="lg:col-span-2">
-            <DiaryTimeline 
-              entries={entries}
-              onEntryClick={(entry) => {
-                setSelectedEntry(entry);
-                setSelectedDate(parseISO(entry.entry_date));
-                setShowForm(true);
-              }}
+          <DiaryTimeline 
+            entries={entries}
+            onEntryClick={(entry) => {
+              navigate(`/write/${entry.mood || 'neutral'}?entryId=${entry.id}`);
+            }}
             />
           </div>
         </div>
