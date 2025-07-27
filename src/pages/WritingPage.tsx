@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { ArrowLeft, Save } from 'lucide-react';
@@ -71,21 +71,59 @@ export default function WritingPage() {
   const { mood } = useParams<{ mood: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [entrySetup, setEntrySetup] = useState<any>(null);
+  const [existingEntry, setExistingEntry] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  
+  const entryId = searchParams.get('entryId');
   
   const theme = mood && moodThemes[mood as keyof typeof moodThemes] 
     ? moodThemes[mood as keyof typeof moodThemes]
     : moodThemes.neutral;
 
   useEffect(() => {
-    // Get the entry setup data from session storage
-    const setupData = sessionStorage.getItem('entrySetup');
-    if (setupData) {
-      setEntrySetup(JSON.parse(setupData));
+    if (entryId) {
+      // Load existing entry
+      fetchExistingEntry();
+    } else {
+      // Get the entry setup data from session storage for new entries
+      const setupData = sessionStorage.getItem('entrySetup');
+      if (setupData) {
+        setEntrySetup(JSON.parse(setupData));
+      }
     }
-  }, []);
+  }, [entryId]);
+
+  const fetchExistingEntry = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('diary_entries')
+        .select('*')
+        .eq('id', entryId)
+        .eq('user_id', user!.id)
+        .single();
+
+      if (error) throw error;
+      
+      setExistingEntry(data);
+      setContent(data.content);
+      setIsEditing(true);
+      setEntrySetup({
+        title: data.title,
+        photo: data.photo_url
+      });
+    } catch (error) {
+      console.error('Error fetching entry:', error);
+      toast({
+        title: "Error loading entry",
+        description: "Failed to load the diary entry.",
+        variant: "destructive"
+      });
+    }
+  };
 
   const uploadPhoto = async (file: File): Promise<string | null> => {
     try {
@@ -122,35 +160,56 @@ export default function WritingPage() {
     setLoading(true);
 
     try {
-      let photoUrl = null;
+      if (isEditing && existingEntry) {
+        // Update existing entry
+        const { error } = await supabase
+          .from('diary_entries')
+          .update({
+            content: content.trim(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingEntry.id)
+          .eq('user_id', user!.id);
 
-      // Upload photo if exists
-      if (entrySetup?.photoFile) {
-        photoUrl = await uploadPhoto(entrySetup.photoFile);
+        if (error) throw error;
+
+        toast({
+          title: "Entry updated!",
+          description: "Your diary entry has been updated successfully."
+        });
+      } else {
+        // Create new entry
+        let photoUrl = null;
+
+        // Upload photo if exists
+        if (entrySetup?.photoFile) {
+          photoUrl = await uploadPhoto(entrySetup.photoFile);
+        }
+
+        const entryData = {
+          user_id: user!.id,
+          title: entrySetup?.title || null,
+          content: content.trim(),
+          entry_date: format(new Date(), 'yyyy-MM-dd'),
+          mood: (mood || null) as 'happy' | 'sad' | 'excited' | 'calm' | 'anxious' | 'grateful' | 'angry' | 'peaceful' | null,
+          photo_url: photoUrl,
+        };
+
+        const { error } = await supabase
+          .from('diary_entries')
+          .insert(entryData);
+
+        if (error) throw error;
+
+        toast({
+          title: "Entry saved!",
+          description: "Your diary entry has been saved successfully."
+        });
+
+        // Clear session storage
+        sessionStorage.removeItem('entrySetup');
       }
 
-      const entryData = {
-        user_id: user!.id,
-        title: entrySetup?.title || null,
-        content: content.trim(),
-        entry_date: format(new Date(), 'yyyy-MM-dd'),
-        mood: (mood || null) as 'happy' | 'sad' | 'excited' | 'calm' | 'anxious' | 'grateful' | 'angry' | 'peaceful' | null,
-        photo_url: photoUrl,
-      };
-
-      const { error } = await supabase
-        .from('diary_entries')
-        .insert(entryData);
-
-      if (error) throw error;
-
-      toast({
-        title: "Entry saved!",
-        description: "Your diary entry has been saved successfully."
-      });
-
-      // Clear session storage
-      sessionStorage.removeItem('entrySetup');
       navigate('/');
     } catch (error) {
       console.error('Error saving entry:', error);
